@@ -79,7 +79,7 @@ from isaaclab.envs import (
 )
 from isaaclab.utils.assets import retrieve_file_path
 from isaaclab.utils.dict import print_dict
-from isaaclab.utils.pretrained_checkpoint import get_published_pretrained_checkpoint
+# from isaaclab.utils.pretrained_checkpoint import get_published_pretrained_checkpoint
 
 from isaaclab_rl.rsl_rl import RslRlBaseRunnerCfg, RslRlVecEnvWrapper
 from exporter import export_policy_as_jit, export_policy_as_onnx
@@ -112,7 +112,8 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg, agen
     log_root_path = os.path.abspath(log_root_path)
     print(f"[INFO] Loading experiment from directory: {log_root_path}")
     if args_cli.use_pretrained_checkpoint:
-        resume_path = get_published_pretrained_checkpoint("rsl_rl", train_task_name)
+        # resume_path = get_published_pretrained_checkpoint("rsl_rl", train_task_name)
+        resume_path = None 
         if not resume_path:
             print("[INFO] Unfortunately a pre-trained checkpoint is currently unavailable for this task.")
             return
@@ -354,7 +355,12 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg, agen
             # run everything in inference mode
             with torch.inference_mode():
                 # agent stepping
-                actions, *_ = policy(obs)
+                actions = None  # 这里原始的action, *_ = policy(obs) 针对单值返回会有问题, tensor shape会减少一个维度似乎
+                raw_actions = policy(obs)
+                if (isinstance(raw_actions, tuple) or isinstance(raw_actions, list)) and len(raw_actions) > 0:
+                    actions = raw_actions[0]
+                else:
+                    actions = raw_actions
                 # env stepping
                 obs, *_ = env.step(actions)
             if args_cli.video:
