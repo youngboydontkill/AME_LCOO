@@ -36,3 +36,19 @@ class G1AMEPPORunnerCfg(RslRlOnPolicyRunnerCfg):
         desired_kl=0.01,
         max_grad_norm=1.0,
     )
+
+
+@configclass
+class G1BaselinePPORunnerCfg(G1AMEPPORunnerCfg):
+    """Match AME PPO settings while removing attention from the policy."""
+
+    experiment_name = "g1_baseline"
+    policy = RslRlPpoActorCriticCfg(
+        class_name="ActorCriticCNNMLP",
+        init_noise_std=1.0,
+        actor_obs_normalization=False,
+        critic_obs_normalization=False,
+        actor_hidden_dims=[512, 256, 128],
+        critic_hidden_dims=[512, 256, 128],
+        activation="elu",
+    )
