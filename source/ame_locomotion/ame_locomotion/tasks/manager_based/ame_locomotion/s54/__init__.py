@@ -26,3 +26,27 @@ gym.register(
         ),
     },
 )
+
+gym.register(
+    id="AME-Kuavo-S54-Depth-v0",
+    entry_point="isaaclab.envs:ManagerBasedRLEnv",
+    disable_env_checker=True,
+    kwargs={
+        "env_cfg_entry_point": f"{__name__}.velocity_env_cfg_s54_depth:KuavoS54DepthRoughEnvCfg",
+        "rsl_rl_cfg_entry_point": (
+            f"{agents.__name__}.kuavo_s54_depth_ame_rsl_rl_ppo_cfg:KuavoS54DepthAMEPPORunnerCfg"
+        ),
+    },
+)
+
+gym.register(
+    id="AME-Kuavo-S54-Depth-Play-v0",
+    entry_point="isaaclab.envs:ManagerBasedRLEnv",
+    disable_env_checker=True,
+    kwargs={
+        "env_cfg_entry_point": f"{__name__}.velocity_env_cfg_s54_depth:KuavoS54DepthRoughEnvCfg_PLAY",
+        "rsl_rl_cfg_entry_point": (
+            f"{agents.__name__}.kuavo_s54_depth_ame_rsl_rl_ppo_cfg:KuavoS54DepthAMEPPORunnerCfg"
+        ),
+    },
+)

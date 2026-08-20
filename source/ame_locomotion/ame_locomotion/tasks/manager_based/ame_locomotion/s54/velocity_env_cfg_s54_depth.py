@@ -1,0 +1,90 @@
+"""Kuavo S54 AME task with a 42x42 depth-camera observation."""
+
+import importlib
+
+import isaaclab.sim as sim_utils
+from isaaclab.managers import ObservationGroupCfg as ObsGroup
+from isaaclab.managers import ObservationTermCfg as ObsTerm
+from isaaclab.managers import SceneEntityCfg
+from isaaclab.sensors import CameraCfg
+from isaaclab.utils import configclass
+
+from ame_locomotion.tasks.manager_based.ame_locomotion import mdp
+
+from . import velocity_env_cfg_s54 as s54_cfg
+
+
+_g1_cfg = importlib.import_module(
+    "ame_locomotion.tasks.manager_based.ame_locomotion.29dof.velocity_env_cfg_29dof"
+)
+
+
+@configclass
+class KuavoS54DepthSceneCfg(_g1_cfg.MySceneCfg):
+    """S54 scene with a forward-facing depth camera."""
+
+    depth_camera = CameraCfg(
+        prim_path="{ENV_REGEX_NS}/Robot/waist_yaw_link/depth_camera",
+        update_period=0.02,
+        height=42,
+        width=42,
+        data_types=["distance_to_image_plane"],
+        spawn=sim_utils.PinholeCameraCfg(
+            focal_length=24.0,
+            horizontal_aperture=20.955,
+            clipping_range=(0.05, 5.0),
+        ),
+        offset=CameraCfg.OffsetCfg(
+            pos=(0.0787, 0.0, -0.028449),
+            rot=(0.624338, 0.331967, -0.331967, -0.624338),
+            convention="ros",
+        ),
+    )
+
+
+@configclass
+class DepthObservationsCfg(_g1_cfg.ObservationsCfg):
+    """Policy and critic observations for the depth task."""
+
+    @configclass
+    class PolicyCfg(_g1_cfg.ObservationsCfg.PolicyCfg):
+        height_scan = None
+        depth_image = ObsTerm(
+            func=mdp.depth_image,
+            params={"sensor_cfg": SceneEntityCfg("depth_camera")},
+        )
+
+    @configclass
+    class CriticCfg(_g1_cfg.ObservationsCfg.CriticCfg):
+        height_scan = None
+        depth_image = ObsTerm(
+            func=mdp.depth_image,
+            params={"sensor_cfg": SceneEntityCfg("depth_camera")},
+        )
+
+    policy: PolicyCfg = PolicyCfg()
+    critic: CriticCfg = CriticCfg()
+
+
+@configclass
+class KuavoS54DepthRoughEnvCfg(s54_cfg.KuavoS54RoughEnvCfg):
+    """Training configuration for AME on Kuavo S54 with depth input."""
+
+    scene: KuavoS54DepthSceneCfg = KuavoS54DepthSceneCfg(num_envs=2048, env_spacing=2.5)
+    observations: DepthObservationsCfg = DepthObservationsCfg()
+
+    def __post_init__(self):
+        super().__post_init__()
+        self.scene.height_scanner = None
+
+
+@configclass
+class KuavoS54DepthRoughEnvCfg_PLAY(s54_cfg.KuavoS54RoughEnvCfg_PLAY):
+    """Playback configuration for AME on Kuavo S54 with depth input."""
+
+    scene: KuavoS54DepthSceneCfg = KuavoS54DepthSceneCfg(num_envs=50, env_spacing=2.5)
+    observations: DepthObservationsCfg = DepthObservationsCfg()
+
+    def __post_init__(self):
+        super().__post_init__()
+        self.scene.height_scanner = None

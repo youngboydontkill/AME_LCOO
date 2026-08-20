@@ -122,17 +122,36 @@ def elevation_map(env: ManagerBasedEnv, sensor_cfg: SceneEntityCfg, noise: bool 
     current_map = sensor_coords.reshape(N, B * 3)
 
     return current_map
-    
-    # if noise:
-    #     # Apply data delay: update map only every 5 steps or on reset (10Hz instead of 50Hz)
-    #     update_mask = (env.episode_length_buf % 5 == 0)
-    #     if hasattr(env, "reset_buf"):
-    #         update_mask = update_mask | env.reset_buf
-    #     update_env_ids = update_mask.nonzero(as_tuple=False).squeeze(-1)
-        
-    #     if len(update_env_ids) > 0:
-    #         env._last_elevation_map[update_env_ids] = current_map[update_env_ids]
 
-    #     return env._last_elevation_map.clone()
-    # else:
-    #     return current_map
+
+def depth_image(
+    env: ManagerBasedEnv,
+    sensor_cfg: SceneEntityCfg,
+    min_depth: float = 0.0,
+    max_depth: float = 5.0,
+    image_size: tuple[int, int] = (42, 42),
+) -> torch.Tensor:
+    """Return a clipped and normalized depth image as a flat observation.
+
+    Invalid camera pixels are treated as out-of-range pixels and therefore map
+    to ``+1`` after normalization. This gives the policy a stable value for
+    pixels where the renderer reports NaN or infinity.
+    """
+    if max_depth <= min_depth:
+        raise ValueError(f"max_depth must be greater than min_depth, got {min_depth} and {max_depth}")
+
+    camera = env.scene.sensors[sensor_cfg.name]
+    depth = camera.data.output["distance_to_image_plane"]
+    if depth.ndim == 4:
+        if depth.shape[-1] != 1:
+            raise ValueError(f"Expected a single-channel depth image, got shape {tuple(depth.shape)}")
+        depth = depth[..., 0]
+    if depth.ndim != 3:
+        raise ValueError(f"Expected depth image with shape (N, H, W), got {tuple(depth.shape)}")
+    if tuple(depth.shape[-2:]) != image_size:
+        raise ValueError(f"Expected depth image size {image_size}, got {tuple(depth.shape[-2:])}")
+
+    depth = torch.nan_to_num(depth, nan=max_depth, posinf=max_depth, neginf=min_depth)
+    depth = torch.clamp(depth, min=min_depth, max=max_depth)
+    depth = 2.0 * (depth - min_depth) / (max_depth - min_depth) - 1.0
+    return depth.reshape(depth.shape[0], -1)

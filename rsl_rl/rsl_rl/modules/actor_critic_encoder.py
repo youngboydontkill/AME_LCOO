@@ -23,7 +23,7 @@ class ActorCriticEncoder(nn.Module):
         init_noise_std=1.0,
         noise_std_type: str = "scalar",
         # Terrain encoder parameters
-        map_scan_dim=(33, 21, 3),  # L=33, W=21, 3D coordinates
+        map_scan_dim=(33, 21, 3),  # L=33, W=21, 3D coordinates; depth uses (42, 42, 1)
         # map_scan_dim=(17, 11, 3),  # L=17, W=11, 3D coordinates
         mha_dim=64,  # MHA feature dimension
         num_heads=16,  # Number of attention heads
@@ -121,7 +121,7 @@ class ActorCriticEncoder(nn.Module):
         """Build terrain encoder modules shared by actor and critic."""
         if not self.cnn_downsample:
             self.map_cnn = nn.Sequential(
-                nn.Conv2d(3, 16, kernel_size=5, padding=2),
+                nn.Conv2d(self.coord_dim, 16, kernel_size=5, padding=2),
                 nn.ReLU(),
                 nn.BatchNorm2d(16),
                 nn.Conv2d(16, self.cnn_output_dim, kernel_size=5, padding=2),
@@ -130,7 +130,7 @@ class ActorCriticEncoder(nn.Module):
             )
         else:
             self.map_cnn = nn.Sequential(
-                nn.Conv2d(3, 16, kernel_size=5, padding=2, stride=2),
+                nn.Conv2d(self.coord_dim, 16, kernel_size=5, padding=2, stride=2),
                 nn.ReLU(),
                 nn.BatchNorm2d(16),
                 nn.Conv2d(16, self.cnn_output_dim, kernel_size=3, padding=1),
@@ -160,17 +160,13 @@ class ActorCriticEncoder(nn.Module):
         # Stored order and reshape order differ, so swap W/L in reshape to keep spatial alignment.
         map_scan = obs[:, -self.L * self.W * self.coord_dim:].reshape(-1, self.W, self.L, self.coord_dim)
 
-        # Height-only variant
-        # height_map = map_scan[:, :, :, 2:3]  # [batch, W, L, 1]
-        # Full 3D-coordinate variant (current)
-        height_map = map_scan
-
-        height_map = height_map.permute(0, 3, 1, 2)
-        cnn_features = self.map_cnn(height_map)
+        map_image = map_scan.permute(0, 3, 1, 2)
+        cnn_features = self.map_cnn(map_image)
         if not self.cnn_downsample:
             cnn_features = cnn_features.permute(0, 2, 3, 1).reshape(-1, self.L * self.W, self.cnn_output_dim)
         else:
-            cnn_features = cnn_features.permute(0, 2, 3, 1).reshape(-1, (self.L // 2 + 1) * (self.W // 2 + 1), self.cnn_output_dim)
+            num_tokens = cnn_features.shape[-2] * cnn_features.shape[-1]
+            cnn_features = cnn_features.permute(0, 2, 3, 1).reshape(-1, num_tokens, self.cnn_output_dim)
 
         # # Optional branch: concatenate sampled 3D coordinates with CNN features
         # if not self.cnn_downsample:
