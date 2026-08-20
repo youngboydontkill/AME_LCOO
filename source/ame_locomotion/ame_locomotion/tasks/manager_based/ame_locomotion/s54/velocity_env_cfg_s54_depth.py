@@ -6,7 +6,7 @@ import isaaclab.sim as sim_utils
 from isaaclab.managers import ObservationGroupCfg as ObsGroup
 from isaaclab.managers import ObservationTermCfg as ObsTerm
 from isaaclab.managers import SceneEntityCfg
-from isaaclab.sensors import CameraCfg
+from isaaclab.sensors import TiledCameraCfg
 from isaaclab.utils import configclass
 
 from ame_locomotion.tasks.manager_based.ame_locomotion import mdp
@@ -23,7 +23,7 @@ _g1_cfg = importlib.import_module(
 class KuavoS54DepthSceneCfg(_g1_cfg.MySceneCfg):
     """S54 scene with a forward-facing depth camera."""
 
-    depth_camera = CameraCfg(
+    depth_camera = TiledCameraCfg(
         prim_path="{ENV_REGEX_NS}/Robot/waist_yaw_link/depth_camera",
         update_period=0.02,
         height=42,
@@ -34,8 +34,8 @@ class KuavoS54DepthSceneCfg(_g1_cfg.MySceneCfg):
             horizontal_aperture=20.955,
             clipping_range=(0.05, 5.0),
         ),
-        offset=CameraCfg.OffsetCfg(
-            pos=(0.0787, 0.0, -0.028449),
+        offset=TiledCameraCfg.OffsetCfg(
+            pos=(0.0987, 0.0, -0.028449),
             rot=(0.624338, 0.331967, -0.331967, -0.624338),
             convention="ros",
         ),

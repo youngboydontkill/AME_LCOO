@@ -529,7 +529,8 @@ class G1RoughEnvCfg(ManagerBasedRLEnvCfg):
             self.observations.policy.joint_pos.noise=None
             self.observations.policy.joint_vel.noise=None
             self.observations.policy.actions.noise=None
-            self.observations.policy.height_scan.params["noise"]=False
+            if self.observations.policy.height_scan is not None:
+                self.observations.policy.height_scan.params["noise"] = False
             # Reward Weights
             self.rewards.termination_penalty.weight = -200
             self.rewards.track_lin_vel_xy_exp.weight = 2.0
@@ -650,8 +651,8 @@ class G1RoughEnvCfg_PLAY(G1RoughEnvCfg):
 
         # disable randomization for play
         self.observations.policy.enable_corruption = False
-        self.observations.policy.height_scan.params["noise"]=False
+        if self.observations.policy.height_scan is not None:
+            self.observations.policy.height_scan.params["noise"] = False
         # remove random pushing
         self.events.base_external_force_torque = None
         self.events.push_robot = None
-
