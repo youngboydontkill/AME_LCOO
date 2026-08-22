@@ -66,6 +66,7 @@ import time
 import torch
 from isaaclab.markers import VisualizationMarkers, VisualizationMarkersCfg
 import isaaclab.sim as sim_utils
+from isaaclab.sensors.camera.utils import create_pointcloud_from_depth
 from typing import Optional
 
 from rsl_rl.runners import DistillationRunner, OnPolicyRunner
@@ -243,15 +244,46 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg, agen
         """Visualize attention weights using color and marker size."""
         if attn is None or attn.numel() == 0:
             return
-        
-        try:
-            height_scanner = env.unwrapped.scene["height_scanner"]
-            if not hasattr(height_scanner.data, "ray_hits_w"):
-                print("[WARN] height_scanner.data.ray_hits_w not available")
-                return
 
-            # Use ray hit points from env 0
-            ray_hits = height_scanner.data.ray_hits_w[0]  # [num_rays, 3]
+        try:
+            scene = env.unwrapped.scene
+            if "height_scanner" in scene.sensors:
+                height_scanner = scene.sensors["height_scanner"]
+                if not hasattr(height_scanner.data, "ray_hits_w"):
+                    print("[WARN] height_scanner.data.ray_hits_w not available")
+                    return
+
+                # Use ray hit points from env 0.
+                ray_hits = height_scanner.data.ray_hits_w[0]  # [num_rays, 3]
+                ray_grid_shape = scan_grid_shape
+            elif "depth_camera" in scene.sensors:
+                # Depth tasks deliberately disable height_scanner. Reconstruct the
+                # camera pixels in world coordinates so attention can still be
+                # visualized at the locations observed by the policy.
+                depth_camera = scene.sensors["depth_camera"]
+                depth = depth_camera.data.output["distance_to_image_plane"][0]
+                if depth.ndim == 3 and depth.shape[-1] == 1:
+                    depth = depth[..., 0]
+                if depth.ndim != 2:
+                    raise ValueError(f"Expected a 2D depth image, got shape {tuple(depth.shape)}")
+
+                image_height, image_width = depth.shape
+                ray_hits = create_pointcloud_from_depth(
+                    depth_camera.data.intrinsic_matrices[0],
+                    depth,
+                    keep_invalid=True,
+                    position=depth_camera.data.pos_w[0],
+                    orientation=depth_camera.data.quat_w_ros[0],
+                    device=depth.device,
+                )
+                # Isaac Lab's unprojection is ordered width-first; convert it to
+                # the row-major image order used by the CNN and its attention.
+                ray_hits = ray_hits.reshape(image_width, image_height, 3).permute(1, 0, 2).reshape(-1, 3)
+                ray_grid_shape = (image_height, image_width)
+            else:
+                if timestep % 50 == 0:
+                    print("[WARN] Attention visualization requires a height_scanner or depth_camera sensor")
+                return
 
             # Attention weights from env 0 [N_attn]
             attn0 = attn[0, 0]
@@ -267,8 +299,8 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg, agen
                 attn_vals = attn0
             elif n_rays > n_attn:
                 selected_hits = None
-                if scan_grid_shape is not None:
-                    rows, cols = scan_grid_shape
+                if ray_grid_shape is not None:
+                    rows, cols = ray_grid_shape
                     if rows * cols == n_rays:
                         ray_hits_grid = ray_hits.reshape(rows, cols, 3)
                         if hasattr(policy_nn, "cnn_downsample") and bool(getattr(policy_nn, "cnn_downsample")):

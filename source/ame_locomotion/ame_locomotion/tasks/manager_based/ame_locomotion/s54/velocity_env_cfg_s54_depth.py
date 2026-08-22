@@ -30,14 +30,18 @@ class KuavoS54DepthSceneCfg(_g1_cfg.MySceneCfg):
         width=42,
         data_types=["distance_to_image_plane"],
         spawn=sim_utils.PinholeCameraCfg(
-            focal_length=24.0,
+            # Match the 68-degree vertical FOV used by the source MuJoCo camera.
+            focal_length=15.5335,
             horizontal_aperture=20.955,
             clipping_range=(0.05, 5.0),
         ),
         offset=TiledCameraCfg.OffsetCfg(
             pos=(0.0987, 0.0, -0.028449),
             rot=(0.624338, 0.331967, -0.331967, -0.624338),
-            convention="ros",
+            # This pose comes from a MuJoCo camera, whose optical frame follows
+            # OpenGL (-Z forward, +Y up). Treating it as ROS reverses the view
+            # direction and makes the camera look into the robot's waist.
+            convention="opengl",
         ),
     )
 
@@ -76,6 +80,9 @@ class KuavoS54DepthRoughEnvCfg(s54_cfg.KuavoS54RoughEnvCfg):
     def __post_init__(self):
         super().__post_init__()
         self.scene.height_scanner = None
+        # Bootstrap the more complex visual policy on the lowest terrain row.
+        # Successful environments will still advance through the normal curriculum.
+        self.scene.terrain.max_init_terrain_level = 0
 
 
 @configclass
